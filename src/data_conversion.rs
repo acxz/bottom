@@ -225,6 +225,10 @@ pub fn convert_cpu_data_points(
         }
     }
 
+    // keep track of data at previous time for smoothing
+    let mut prev_cpu_data = vec![0.0; existing_cpu_data.len() - 1];
+    let mut first_data = true;
+
     for (time, data) in &current_data.timed_data_vec {
         let time_from_start: f64 = (current_time.duration_since(*time).as_millis() as f64).floor();
 
@@ -258,9 +262,20 @@ pub fn convert_cpu_data_points(
                     // skip sorting avg
                     cpu_value = sorted_cpu_data[itx - 1];
                 }
+
                 cpu_data.legend_value = format!("{:.0}%", cpu_value.round());
+                if !first_data {
+                    // smooth cpu_value for the time series
+                    let alpha = 0.50;
+                    cpu_value = alpha * cpu_value + (1.0 - alpha) * prev_cpu_data[itx];
+                }
                 cpu_data.cpu_data.push((-time_from_start, cpu_value));
+                prev_cpu_data[itx] = cpu_value;
             }
+        }
+
+        if first_data {
+            first_data = false;
         }
 
         if *time == current_time {
